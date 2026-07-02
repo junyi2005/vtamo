@@ -6,7 +6,7 @@
   <a href="#-todo--release-plan"><img src="https://img.shields.io/badge/status-code%20coming%20soon-orange"></a>
   <img src="https://img.shields.io/badge/task-Sign%20Language%20Translation-blue">
   <img src="https://img.shields.io/badge/setting-gloss--free-green">
-  <img src="https://img.shields.io/badge/license-TBD-lightgrey">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey"></a>
 </p>
 
 **Junyi Hu**<sup>1</sup>, **Zhewen He**<sup>1</sup>, **Haomian Huang**<sup>1</sup>, **Aoxiang Yang**<sup>1</sup>, **Yi Fang**<sup>1,2,†</sup>
@@ -47,14 +47,7 @@ VTaMo introduces alignment at **three complementary granularities**, trained joi
 
 ## Results
 
-VTaMo reaches **state-of-the-art gloss-free** performance across four benchmarks spanning three languages, using only RGB input and no visual-encoder fine-tuning or large-scale sign-language pre-training.
-
-| Benchmark | Language | BLEU-4 | ROUGE-L | BLEURT |
-|---|---|:--:|:--:|:--:|
-| Phoenix-2014T | German  | **28.86** | **60.24** | — |
-| CSL-Daily     | Chinese | **27.16** | **57.28** | — |
-| How2Sign      | English | **18.47** | 37.14 | **50.26** |
-| OpenASL       | English | **25.94** | **46.85** | **62.48** |
+VTaMo reaches **state-of-the-art gloss-free** performance across four benchmarks spanning three languages (Phoenix-2014T, CSL-Daily, How2Sign, OpenASL), using only RGB input and no visual-encoder fine-tuning or large-scale sign-language pre-training.
 
 Highlights vs. prior gloss-free work:
 
@@ -87,6 +80,10 @@ If you find VTaMo useful in your research, please consider citing:
   year      = {2026}
 }
 ```
+
+## License
+
+This project is released under the [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](LICENSE) license. You are free to share and adapt the material for **non-commercial** purposes with appropriate attribution. The license may be updated in the future.
 
 ## Acknowledgements
 
