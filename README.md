@@ -45,19 +45,6 @@ VTaMo introduces alignment at **three complementary granularities**, trained joi
 
 **Architecture.** A frozen **CLIP-ViT-Large** backbone (with multi-scale S²-Wrapper features) encodes frames; an attention-based temporal encoder downsamples them; a fusion projector maps to the language-model space; and a **LoRA-adapted Flan-T5-XL** decoder generates the pseudo-gloss. Only lightweight adapters and alignment modules are trained — the visual and language backbones stay frozen.
 
-## Results
-
-VTaMo reaches **state-of-the-art gloss-free** performance across four benchmarks spanning three languages (Phoenix-2014T, CSL-Daily, How2Sign, OpenASL), using only RGB input and no visual-encoder fine-tuning or large-scale sign-language pre-training.
-
-Highlights vs. prior gloss-free work:
-
-- **+4.54 / +6.61 BLEU-4** over SpaMo on Phoenix-2014T / CSL-Daily; on Phoenix-2014T VTaMo comes within **0.09 BLEU-4** of the best *gloss-based* method.
-- **+8.36 BLEU-4** over SpaMo on How2Sign; best BLEU-1, BLEU-4 and BLEURT despite competitors using pose+RGB and large-scale pre-training.
-- On OpenASL (vocabulary > 10k words), **+2.80 / +2.74 BLEU-4** over Uni-Sign / SHuBERT.
-- **Robust to appearance shifts:** on synthetically edited backgrounds and signer appearance (Stable Diffusion + ControlNet), degradation stays ≤ 0.42 BLEU-4, indicating VTaMo attends to gesture semantics rather than scene or identity.
-
-Ablations confirm all three alignment components are necessary and non-substitutable, and that the gains come from the alignment design rather than the choice of language-model backbone.
-
 ## 📌 TODO / Release Plan
 
 We are actively cleaning up the codebase and model artifacts for release. Progress will be tracked here:
