@@ -25,6 +25,11 @@ Sign language translation (SLT) converts continuous sign videos into spoken-lang
 
 ## Method
 
+<p align="center">
+  <img src="assets/pipeline.png" width="100%" alt="VTaMo pipeline">
+</p>
+<p align="center"><i>The VTaMo pipeline. A sign video is encoded by a frozen CLIP-ViT backbone with a lightweight temporal encoder and fusion projection (A, B). Given text embeddings (D), VTaMo performs <b>local alignment</b> with an entropy-regularized OT (Sinkhorn) solver and <b>global alignment</b> via an orthogonal transform with a memory queue (C1, C2). The correspondence drives <b>window reordering</b> (C3) and <b>position-aligned contrastive learning</b> (C4), and a LoRA-adapted Flan-T5 decoder generates the translation (E).</i></p>
+
 VTaMo introduces alignment at **three complementary granularities**, trained jointly with the standard translation objective:
 
 - **① Local alignment — entropy-regularized Optimal Transport.**
