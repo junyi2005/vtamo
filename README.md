@@ -3,6 +3,7 @@
 > Official repository for **VTaMo**, a gloss-free sign language translation framework built on **explicit multi-granularity vision–text alignment**.
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2607.09126"><img src="https://img.shields.io/badge/arXiv-2607.09126-b31b1b"></a>
   <a href="#-todo--release-plan"><img src="https://img.shields.io/badge/status-training%20code%20released-brightgreen"></a>
   <img src="https://img.shields.io/badge/task-Sign%20Language%20Translation-blue">
   <img src="https://img.shields.io/badge/setting-gloss--free-green">
@@ -143,16 +144,31 @@ Checkpoints and logs are written to `./logs/<run_name>/`.
 
 ### Benchmark coverage
 
-| Benchmark | Config | Status |
-|---|---|---|
-| How2Sign | `configs/vtamo_how2sign.yaml` | included |
-| OpenASL | `configs/vtamo_openasl.yaml` | included |
-| Phoenix-2014T | — | dataset loader (`dataset/p14t.py`) ships, config to follow |
-| CSL-Daily | — | dataset loader (`dataset/csl_daily.py`) ships, config to follow |
+All four benchmarks in the paper have a config. The alignment and training
+hyperparameters are identical across them — only the dataset block differs.
 
-The Phoenix-2014T and CSL-Daily configs are not in this drop: both need a
-language-specific (German / Chinese) pseudo-gloss step, whereas the bundled
-`pseudo_gloss/` is English-only. They will land together with the inference code.
+| Benchmark | Config | spaCy model for the pseudo-gloss | Splits |
+|---|---|---|---|
+| How2Sign | `configs/vtamo_how2sign.yaml` | `en_core_web_sm` | train / val / test |
+| OpenASL | `configs/vtamo_openasl.yaml` | `en_core_web_sm` | train / val / test |
+| Phoenix-2014T | `configs/vtamo_p14t.yaml` | `de_core_news_sm` | train / dev / test |
+| CSL-Daily | `configs/vtamo_csl_daily.yaml` | `zh_core_web_sm` | train / dev / test |
+
+The POS filter is language-universal (it keys off Universal POS tags); only the
+tagger changes. Select it with `--spacy_model`:
+
+```bash
+python -m spacy download de_core_news_sm
+python scripts/preprocess/run_external_pseudo_gloss.py \
+    --spacy_model de_core_news_sm --input sentences.txt --output pseudo_gloss.json
+```
+
+> **Honest caveat.** The How2Sign and OpenASL configs are the ones we exercised.
+> The Phoenix-2014T and CSL-Daily configs carry the same paper hyperparameters and
+> their dataset loaders and model instantiate cleanly, but we did not run them
+> end-to-end for this release. Treat their dataset roots as a starting point.
+> CSL-Daily is Chinese and the config uses Flan-T5-XL as the paper states;
+> `google/mt5-xl` is the multilingual alternative if you need better coverage.
 
 ## 📌 TODO / Release Plan
 

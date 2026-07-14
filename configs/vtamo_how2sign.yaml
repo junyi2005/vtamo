@@ -61,9 +61,8 @@ model:
     beta_tv: 0.1                         # beta_tv = 0.1
     beta_null: 0.1                       # beta_null = 0.1
 
-    # Three-phase epsilon annealing:
+    # Three-phase epsilon annealing (the only epsilon schedule):
     #   0.12 -> 0.10 over the first 10 epochs, -> 0.03 over the following 80.
-    use_three_phase_eps: true
     eps_high: 0.12                       # eps_high = 0.12
     eps_mid: 0.10                        # eps_mid  = 0.10
     eps_low: 0.03                        # eps_low  = 0.03

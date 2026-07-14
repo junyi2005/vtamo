@@ -29,7 +29,7 @@ so windows are consumed in signing order.
 Key config parameters:
     local_align_enabled / local_align_iters / null_ratio_target
     beta_local / beta_tv / beta_null
-    use_three_phase_eps / eps_high / eps_mid / eps_low / eps_phase2_epochs / eps_phase3_epochs
+    eps_high / eps_mid / eps_low / eps_phase2_epochs / eps_phase3_epochs
     global_emd_enabled / emd_eps / emd_iters / emd_ramp_steps / lambda_g_max / beta_orth
     global_queue_size / global_queue_min_size
     position_contrastive_enabled / position_contra_temp / beta_pos_contra
@@ -119,9 +119,6 @@ class FlanT5SLT(AbstractSLT):
         # Local alignment parameters
         local_align_enabled: bool = False,
         local_align_eps: float = 0.1,
-        local_align_eps_start: float = 0.1,    # Starting eps for decay
-        local_align_eps_end: float = 0.06,     # Ending eps for decay
-        local_align_eps_decay_epochs: int = 40, # Epochs to decay over
         local_align_iters: int = 10,
         null_ratio_target: float = 0.2,  # Target: 20% of windows should have NULL as argmax
         beta_local: float = 1.0,
@@ -149,7 +146,6 @@ class FlanT5SLT(AbstractSLT):
         eps_phase2_epochs: int = 10,      # Epochs for phase 2 (eps_high -> eps_mid)
         eps_phase3_epochs: int = 80,      # Epochs for phase 3 (eps_mid -> eps_low)
         eps_schedule_type: str = "linear",
-        use_three_phase_eps: bool = False,  # Use the paper's 3-phase schedule
         # GLOBAL version: global alignment (learnable orthogonal T + EMD over a FIFO queue)
         # Three-stage schedule:
         # - Stage 0 (0 ~ warm_up_steps): T exists and shapes the local OT, global loss = 0,
@@ -204,9 +200,6 @@ class FlanT5SLT(AbstractSLT):
         # Local alignment parameters
         self.local_align_enabled = local_align_enabled
         self.local_align_eps = local_align_eps
-        self.local_align_eps_start = local_align_eps_start
-        self.local_align_eps_end = local_align_eps_end
-        self.local_align_eps_decay_epochs = local_align_eps_decay_epochs
         self.local_align_iters = local_align_iters
         self.null_ratio_target = null_ratio_target
         self.beta_local = beta_local
@@ -237,7 +230,6 @@ class FlanT5SLT(AbstractSLT):
         self.eps_phase2_epochs = eps_phase2_epochs
         self.eps_phase3_epochs = eps_phase3_epochs
         self.eps_schedule_type = eps_schedule_type
-        self.use_three_phase_eps = use_three_phase_eps
         self._total_steps = None        # cached from the trainer on first train batch
         self._steps_per_epoch = None    # cached from the trainer on first train batch
 
@@ -951,35 +943,6 @@ class FlanT5SLT(AbstractSLT):
             return total_loss, info_dict
         return total_loss
 
-    def on_train_epoch_start(self) -> None:
-        """
-        Called at the start of each training epoch. Updates the OT entropy (eps).
-
-        Two schedules are available:
-        - use_three_phase_eps=True: the paper's piecewise schedule, eps_high held
-          through phase 1, annealed eps_high -> eps_mid over eps_phase2_epochs, then
-          eps_mid -> eps_low over eps_phase3_epochs.
-        - use_three_phase_eps=False: the legacy single-phase linear decay from
-          local_align_eps_start to local_align_eps_end.
-        """
-        if self.use_three_phase_eps:
-            # Driven per-step in on_train_batch_start(); nothing to do per-epoch.
-            return
-
-        if self.local_align_enabled and hasattr(self, 'local_align_module'):
-            epoch = self.current_epoch
-
-            if epoch < self.local_align_eps_decay_epochs:
-                # Linear interpolation
-                progress = epoch / self.local_align_eps_decay_epochs
-                current_eps = self.local_align_eps_start - progress * (self.local_align_eps_start - self.local_align_eps_end)
-            else:
-                current_eps = self.local_align_eps_end
-
-            # Update the eps in LocalAlignmentModule
-            self.local_align_module.eps = current_eps
-            print(f"[Epoch {epoch}] OT eps updated: {current_eps:.4f}")
-
     def on_train_batch_start(self, batch, batch_idx) -> None:
         """
         Per-step driver for the paper's three-phase epsilon annealing.
@@ -989,11 +952,9 @@ class FlanT5SLT(AbstractSLT):
         Phase 3 (next eps_phase3_epochs):       eps_mid  -> eps_low
         Phase 4 (rest):                         eps = eps_low (sharp)
 
-        Only active when use_three_phase_eps=True; otherwise the legacy per-epoch
-        decay in on_train_epoch_start() applies.
+        This is the only epsilon schedule; there is no alternative code path.
         """
-        if not (self.use_three_phase_eps and self.local_align_enabled
-                and hasattr(self, 'local_align_module')):
+        if not (self.local_align_enabled and hasattr(self, 'local_align_module')):
             return
 
         # Cache the trainer-derived step counts once.

@@ -1,4 +1,4 @@
-# VTaMo — OpenASL.
+# VTaMo — Phoenix-2014T (German).
 #
 # Values carrying an inline paper reference follow the camera-ready
 # "Implementation details" section verbatim, so this config can be checked
@@ -8,6 +8,16 @@
 # queue min size, val interval); each is annotated as such where it appears.
 #
 # Set the dataset roots under `data:` to your own paths (see README "Data layout").
+#
+# NOTE: this config follows the paper's stated hyperparameters, which are identical
+# across benchmarks; only the dataset block below differs. Unlike the How2Sign /
+# OpenASL configs, it has NOT been run end-to-end as part of this release — we do
+# not ship the data. Treat the roots and the split naming as a starting point.
+# Splits are train / dev / test (not val).
+#
+# Pseudo-gloss: the paper applies the same POS filter with a language-specific
+# spaCy model. Pass it explicitly, e.g.
+#   python scripts/preprocess/run_external_pseudo_gloss.py --spacy_model de_core_news_sm ...
 
 model:
   target: vtamo.model.FlanT5SLT
@@ -113,23 +123,24 @@ data:
     batch_size: 6                        # batch size 6
     num_workers: 4
     train:
-      target: dataset.openasl.OpenASL
-      params: &openasl_roots
-        anno_root: ./assets/openasl/label
-        vid_root: ./assets/openasl/videos
-        feat_root: ./assets/openasl/features/clip-vit-large-patch14_openasl
-        mae_feat_root: ./assets/openasl
+      target: dataset.p14t.Phoenix14T
+      params: &roots
+        anno_root: ./assets/phoenix14t/label
+        vid_root: ./assets/phoenix14t/videos
+        feat_root: ./assets/phoenix14t/features/clip-vit-large-patch14_phoenix14t
+        mae_feat_root: ./assets/phoenix14t
         spatial: true
         spatiotemporal: false
         spatial_postfix: "_s2wrapping"
+        spatiotemporal_postfix: ""
         mode: train
     validation:
-      target: dataset.openasl.OpenASL
+      target: dataset.p14t.Phoenix14T
       params:
-        <<: *openasl_roots
-        mode: val
+        <<: *roots
+        mode: dev
     test:
-      target: dataset.openasl.OpenASL
+      target: dataset.p14t.Phoenix14T
       params:
-        <<: *openasl_roots
+        <<: *roots
         mode: test

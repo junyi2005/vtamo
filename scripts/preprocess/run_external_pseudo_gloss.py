@@ -68,8 +68,15 @@ def run_combined(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
     return mod.process_sentences(sentences)
 
 
-def run_pos_only(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
-    """POS-only filter: load get_parts_of_speech from pseudo_gloss_en.py."""
+def run_pos_only(repo_root: Path, sentences: list[str],
+                 spacy_model: str = "en_core_web_sm") -> dict[str, list[str]]:
+    """POS-only filter: load get_parts_of_speech from pseudo_gloss_en.py.
+
+    ``spacy_model`` selects the language-specific spaCy model. The POS filter
+    itself is language-universal (Universal POS tags), so the same rule applies
+    across benchmarks: en_core_web_sm (How2Sign / OpenASL), de_core_news_sm
+    (Phoenix-2014T), zh_core_web_sm (CSL-Daily).
+    """
     pg_path = repo_root / "pseudo_gloss_en.py"
     if not pg_path.exists():
         raise FileNotFoundError(
@@ -99,7 +106,13 @@ def run_pos_only(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
     selected_vocab = ns["selected_vocab"]
 
     import spacy
-    nlp = spacy.load("en_core_web_sm")
+    try:
+        nlp = spacy.load(spacy_model)
+    except OSError as exc:
+        raise SystemExit(
+            f"spaCy model {spacy_model!r} is not installed. Install it with:\n"
+            f"    python -m spacy download {spacy_model}"
+        ) from exc
 
     out: dict[str, list[str]] = {}
     for sent in sentences:
@@ -147,6 +160,16 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--spacy_model",
+        default="en_core_web_sm",
+        help=(
+            "Language-specific spaCy model for the POS filter. The filter rule is "
+            "language-universal; only the tagger changes. en_core_web_sm (How2Sign / "
+            "OpenASL), de_core_news_sm (Phoenix-2014T), zh_core_web_sm (CSL-Daily). "
+            "Only used with --mode pos_only."
+        ),
+    )
+    parser.add_argument(
         "--mode",
         choices=["pos_only", "combined"],
         default="pos_only",
@@ -185,11 +208,19 @@ def main():
     print(f"[in]  {len(unique)} unique sentences from {args.input}")
     print(f"[ext] repo:  {args.pseudo_gloss_repo}")
     print(f"[ext] mode:  {args.mode}")
+    if args.mode == "pos_only":
+        print(f"[ext] spacy: {args.spacy_model}")
 
     if args.mode == "combined":
+        if args.spacy_model != "en_core_web_sm":
+            raise SystemExit(
+                "--mode combined is English-only (it depends on the bundled ASL "
+                "vocabulary); it cannot honour --spacy_model "
+                f"{args.spacy_model!r}. Use --mode pos_only."
+            )
         mapping = run_combined(args.pseudo_gloss_repo, unique)
     else:
-        mapping = run_pos_only(args.pseudo_gloss_repo, unique)
+        mapping = run_pos_only(args.pseudo_gloss_repo, unique, args.spacy_model)
 
     # Convert {sentence: [gloss_words]} → {sentence: "gloss_words ..."}
     flat = {k: " ".join(v).strip() for k, v in mapping.items()}
