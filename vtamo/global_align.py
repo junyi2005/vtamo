@@ -54,8 +54,11 @@ def attention_pool_sequence(
         L, D = X.shape
 
         # Step 1: Compute query as masked mean
+        # NOTE: cast the mask to X.dtype (not .float()), otherwise a fp32 mask
+        # promotes bf16/fp16 activations to fp32 and the matmul below fails on a
+        # dtype mismatch outside autocast.
         if mask is not None:
-            mask_float = mask.float().unsqueeze(-1)  # [L, 1]
+            mask_float = mask.to(X.dtype).unsqueeze(-1)  # [L, 1]
             q = (X * mask_float).sum(dim=0) / mask_float.sum(dim=0).clamp(min=1e-8)  # [D]
         else:
             q = X.mean(dim=0)  # [D]
@@ -83,8 +86,9 @@ def attention_pool_sequence(
         B, L, D = X.shape
 
         # Step 1: Compute query as masked mean
+        # NOTE: cast the mask to X.dtype (not .float()) — see the unbatched branch.
         if mask is not None:
-            mask_float = mask.float().unsqueeze(-1)  # [B, L, 1]
+            mask_float = mask.to(X.dtype).unsqueeze(-1)  # [B, L, 1]
             q = (X * mask_float).sum(dim=1) / mask_float.sum(dim=1).clamp(min=1e-8)  # [B, D]
         else:
             q = X.mean(dim=1)  # [B, D]
@@ -205,7 +209,15 @@ def compute_global_emd_loss_sentence(
     N, D = sign_vecs.shape
     M, _ = text_vecs.shape
     device = sign_vecs.device
-    dtype = sign_vecs.dtype
+
+    # The sign and text towers can reach here in different dtypes (e.g. the queue
+    # holds bf16 text embeddings from the LM but fp32 pooled visual vectors).
+    # Compute the whole global objective in T's dtype: T is the only parameter
+    # being updated here, and keeping it in fp32 also keeps the orthogonality
+    # constraint and the Sinkhorn iterations numerically stable.
+    dtype = T.dtype
+    sign_vecs = sign_vecs.to(dtype)
+    text_vecs = text_vecs.to(dtype)
 
     # Transform sign vectors: v' = normalize(v @ T)
     # T has gradient, sign_vecs should be detached before calling this
