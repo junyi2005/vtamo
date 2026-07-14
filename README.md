@@ -3,7 +3,7 @@
 > Official repository for **VTaMo**, a gloss-free sign language translation framework built on **explicit multi-granularity vision–text alignment**.
 
 <p align="center">
-  <a href="#-todo--release-plan"><img src="https://img.shields.io/badge/status-code%20coming%20soon-orange"></a>
+  <a href="#-todo--release-plan"><img src="https://img.shields.io/badge/status-training%20code%20released-brightgreen"></a>
   <img src="https://img.shields.io/badge/task-Sign%20Language%20Translation-blue">
   <img src="https://img.shields.io/badge/setting-gloss--free-green">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey"></a>
@@ -45,11 +45,116 @@ VTaMo introduces alignment at **three complementary granularities**, trained joi
 
 **Architecture.** A frozen **CLIP-ViT-Large** backbone (with multi-scale S²-Wrapper features) encodes frames; an attention-based temporal encoder downsamples them; a fusion projector maps to the language-model space; and a **LoRA-adapted Flan-T5-XL** decoder generates the pseudo-gloss. Only lightweight adapters and alignment modules are trained — the visual and language backbones stay frozen.
 
+## Getting Started
+
+> **Scope of this release.** This drop contains the **data-preparation and training**
+> code only. Inference/evaluation scripts and pre-trained VTaMo weights are not
+> included yet — see the release plan below. The frozen backbones (CLIP-ViT-L/14,
+> Flan-T5-XL) are downloaded from HuggingFace on first run.
+
+### Repository layout
+
+```
+.
+├── pseudo_gloss/           Step 1 — English sentence → content-word pseudo-gloss
+│                           (contraction expansion, ASL phrase merging, POS filter,
+│                           ASL reordering). Ships its own 27K ASL vocabulary.
+├── scripts/
+│   ├── preprocess/         Step 2 — build How2Sign / OpenASL annotations; bridge
+│   │                       the pseudo-gloss into the annotation format
+│   └── extract_features/   Step 3 — frozen CLIP-ViT-L/14 frame features (S²-Wrapper)
+├── configs/                Step 4 — training configs (OmegaConf)
+│   ├── vtamo_how2sign.yaml
+│   └── vtamo_openasl.yaml
+├── main.py                 training entry point
+├── run_train.sh            training launcher
+├── vtamo/
+│   ├── model.py            VTaMo model (Flan-T5 + LoRA, joint alignment objectives)
+│   ├── ot_sinkhorn.py      ① local alignment: Sinkhorn OT, learnable null token,
+│   │                          window reordering, position-aligned contrastive loss;
+│   │                          also hosts the learnable orthogonal transform T
+│   ├── global_align.py     ② global alignment: orthogonal T, EMD over a FIFO memory
+│   │                          queue, Procrustes init, λ_g and ε schedules
+│   ├── tconv.py            attention-based temporal encoder
+│   └── mm_projector.py     fusion projector
+├── dataset/                dataset loaders + Lightning DataModule
+└── utils/                  S²-Wrapper, BLEU/ROUGE evaluation, helpers
+```
+
+Every hyperparameter in `configs/vtamo_how2sign.yaml` is annotated with the paper
+section it comes from, so the config can be checked line-by-line against the text.
+
+### Installation
+
+```bash
+conda create -n vtamo python=3.10 && conda activate vtamo
+pip install -r requirements.txt
+```
+
+Pseudo-gloss extraction needs spaCy, which is kept out of the pinned training
+env to avoid dependency conflicts:
+
+```bash
+pip install spacy==3.8.14 && python -m spacy download en_core_web_sm
+```
+
+### Data layout
+
+Datasets and extracted features are **linked, never committed**. The configs
+expect the following under `./assets/` (override the roots in the yaml if your
+data lives elsewhere):
+
+```
+assets/
+├── how2sign/
+│   ├── label/{train,val,test}_info.npy          # annotations (scripts/preprocess)
+│   ├── videos/{train,val,test}/<file_id>.mp4
+│   └── features/clip-vit-large-patch14_how2sign/
+│       └── {train,val,test}/<file_id>_s2wrapping.npy
+└── openasl/
+    ├── label/openasl-v1.0-{train,val,test}.tsv
+    ├── videos/
+    └── features/clip-vit-large-patch14_openasl/<file_id>_s2wrapping.npy
+```
+
+### Pipeline
+
+```bash
+# 1. Pseudo-gloss for the target sentences
+python scripts/preprocess/run_external_pseudo_gloss.py \
+    --input sentences.txt --output pseudo_gloss.json
+
+# 2. Annotations (How2Sign shown; see scripts/preprocess/ for OpenASL)
+python scripts/preprocess/convert_how2sign_annotations.py --help
+
+# 3. Frozen CLIP-ViT-L/14 features (S²-Wrapper, 2048-d per frame)
+python scripts/extract_features/extract_clip_from_mp4.py --help
+
+# 4. Train
+./run_train.sh my_run 42                                  # How2Sign (default)
+CONFIG=configs/vtamo_openasl.yaml ./run_train.sh my_run 42  # OpenASL
+```
+
+Checkpoints and logs are written to `./logs/<run_name>/`.
+
+### Benchmark coverage
+
+| Benchmark | Config | Status |
+|---|---|---|
+| How2Sign | `configs/vtamo_how2sign.yaml` | included |
+| OpenASL | `configs/vtamo_openasl.yaml` | included |
+| Phoenix-2014T | — | dataset loader (`dataset/p14t.py`) ships, config to follow |
+| CSL-Daily | — | dataset loader (`dataset/csl_daily.py`) ships, config to follow |
+
+The Phoenix-2014T and CSL-Daily configs are not in this drop: both need a
+language-specific (German / Chinese) pseudo-gloss step, whereas the bundled
+`pseudo_gloss/` is English-only. They will land together with the inference code.
+
 ## 📌 TODO / Release Plan
 
 We are actively cleaning up the codebase and model artifacts for release. Progress will be tracked here:
 
-- [ ] **Release training code** — end-to-end training pipeline for the alignment objectives and decoder.
+- [x] **Release training code** — data preparation + end-to-end training pipeline for the alignment objectives and decoder.
 - [ ] **Release inference & experiment code** — evaluation scripts, pseudo-gloss recovery, and reproduction of the reported benchmarks.
 - [ ] **Release checkpoints** — pre-trained VTaMo weights for the four benchmarks.
 
@@ -73,5 +178,7 @@ If you find VTaMo useful in your research, please consider citing:
 This project is released under the [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](LICENSE) license. You are free to share and adapt the material for **non-commercial** purposes with appropriate attribution. The license may be updated in the future.
 
 ## Acknowledgements
+
+The training codebase builds on **SpaMo** (Hwang et al., *An Efficient Gloss-Free Sign Language Translation Using Spatial Configurations and Motion Dynamics with LLMs*, NAACL 2025); files derived from it retain their original copyright headers. We also thank the authors of How2Sign, OpenASL, CLIP, Flan-T5, and S²-Wrapper, whose datasets and models this work depends on.
 
 This work was partially supported by ChatSign Technology, Ltd.; and the NYUAD Center for AI and Robotics (CAIR), funded by Tamkeen under the NYUAD Research Institute Award CG010. Computational support was provided by the HPC resources at NYU Abu Dhabi and NYU New York.

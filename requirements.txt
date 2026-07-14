@@ -1,0 +1,25 @@
+# VTaMo training environment (python 3.10).
+# These are the versions the reported runs were trained with.
+torch==2.0.1
+torchvision==0.15.2
+pytorch-lightning==1.9.5
+transformers==4.32.0
+peft==0.7.1
+sentencepiece==0.2.1
+omegaconf==2.3.0
+numpy==1.26.4
+pandas==2.3.3
+einops==0.8.1
+av==12.3.0
+Pillow==10.2.0
+matplotlib==3.10.8
+tqdm==4.67.1
+opencv-python
+
+# Evaluation metrics
+sacrebleu==2.2.0
+rouge-score==0.1.2
+
+# Pseudo-gloss extraction only (see pseudo_gloss/README.md).
+# Install in a separate env if it conflicts with the pins above:
+#   pip install spacy==3.8.14 && python -m spacy download en_core_web_sm

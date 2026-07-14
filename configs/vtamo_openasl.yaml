@@ -1,0 +1,125 @@
+# VTaMo — OpenASL.
+#
+# Every value below follows the camera-ready "Implementation details" section.
+# Paper references are given inline so the config can be checked against the text.
+#
+# Set the dataset roots under `data:` to your own paths (see README "Data layout").
+
+model:
+  target: vtamo.model.FlanT5SLT
+
+  params:
+    # ---- Language model (paper: "Language model") ----
+    model_name: google/flan-t5-xl        # Flan-T5-XL backbone, frozen except LoRA
+    cache_dir: ./cache
+    tuning_type: lora
+    lora_r: 16                           # rank r = 16
+    lora_alpha: 32                       # scaling factor alpha = 32
+    lora_dropout: 0.1                    # dropout 0.1  (applied to q,v projections)
+
+    # ---- Architecture (paper: "Architecture") ----
+    input_size: 2048                     # d_v = 2048 (frozen CLIP-ViT-L/14 + S2-Wrapper)
+    inter_hidden: 768                    # d_h = 768
+    use_attention_pool: true             # attention-based temporal encoder
+    attn_num_heads: 4                    # 4 attention heads
+    attn_window_size: 8                  # window size 8
+    attn_downsample_rate: 4              # 4x temporal downsampling
+    attn_dropout: 0.1
+    attn_log_stats: false
+    fusion_mode: spatial                 # spatial features only (no MAE branch)
+
+    # ---- Training (paper: "Training") ----
+    lr: 6.0e-4                           # peak learning rate 6e-4, cosine schedule
+    lr_warmup_steps: 2000                # linear warm-up over the first 2,000 steps
+    monitor: val/bleu4
+    beam_size: 5
+    max_frame_len: 512
+    max_txt_len: 64
+    frame_sample_rate: 1
+    prompt: "Translate the given sentence into {}."
+    cross_modal_align: true
+    combined_loss: true
+    alpha: 1.0
+    use_in_context: false
+    num_in_context: 0
+    warm_up_steps: 40000                 # stage-0 boundary: LM freeze + global-loss gate
+
+    # ---- Local alignment (paper: "Alignment hyperparameters") ----
+    local_align_enabled: true
+    local_align_iters: 10                # N_iter = 10 Sinkhorn iterations
+    null_ratio_target: 0.2               # rho_target = 0.2
+    beta_local: 2.0                      # beta_local = 2.0
+    beta_tv: 0.1                         # beta_tv = 0.1
+    beta_null: 0.1                       # beta_null = 0.1
+
+    # Three-phase epsilon annealing:
+    #   0.12 -> 0.10 over the first 10 epochs, -> 0.03 over the following 80.
+    use_three_phase_eps: true
+    eps_high: 0.12                       # eps_high = 0.12
+    eps_mid: 0.10                        # eps_mid  = 0.10
+    eps_low: 0.03                        # eps_low  = 0.03
+    eps_phase2_epochs: 10                # 10 epochs
+    eps_phase3_epochs: 80                # following 80 epochs
+    eps_schedule_type: linear
+    local_align_eps: 0.12                # initial eps before the schedule kicks in
+
+    # ---- Global alignment (paper: "Alignment hyperparameters") ----
+    global_emd_enabled: true
+    emd_eps: 0.05                        # eps_g = 0.05
+    emd_iters: 20                        # 20 Sinkhorn iterations
+    global_queue_size: 256               # memory queue capacity 256
+    global_queue_min_size: 32
+    lambda_g_max: 0.1                    # ramps 0 -> lambda_g_max = 0.1 ...
+    emd_ramp_steps: 4000                 # ... over 4,000 steps after warm-up
+    emd_schedule_type: linear
+    beta_orth: 0.05                      # beta_orth = 0.05
+
+    # ---- Position-aligned contrastive (paper: "Alignment hyperparameters") ----
+    position_contrastive_enabled: true
+    position_contra_temp: 0.1            # tau_c = 0.1
+    beta_pos_contra: 1.0                 # beta_contra = 1.0
+    position_contra_use_proj: true       # two-layer MLP + GELU + LayerNorm ...
+    position_contra_proj_hidden: null
+    position_contra_proj_dim: 768        # ... projecting to 768 dimensions
+
+lightning:
+  callback:
+    learning_rate_logger:
+      target: pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval: step
+  trainer:
+    accumulate_grad_batches: 2           # gradient accumulation over 2 steps
+    accelerator: gpu
+    devices: 1                           # single A100
+    max_epochs: 200
+    gradient_clip_val: 1.0               # gradient clipping, max norm 1.0
+    check_val_every_n_epoch: 2
+    precision: bf16                      # mixed-precision (bf16)
+
+data:
+  target: dataset.datamodule.DataModuleFromConfig
+  params:
+    batch_size: 6                        # batch size 6
+    num_workers: 4
+    train:
+      target: dataset.openasl.OpenASL
+      params: &openasl_roots
+        anno_root: ./assets/openasl/label
+        vid_root: ./assets/openasl/videos
+        feat_root: ./assets/openasl/features/clip-vit-large-patch14_openasl
+        mae_feat_root: ./assets/openasl
+        spatial: true
+        spatiotemporal: false
+        spatial_postfix: "_s2wrapping"
+        mode: train
+    validation:
+      target: dataset.openasl.OpenASL
+      params:
+        <<: *openasl_roots
+        mode: val
+    test:
+      target: dataset.openasl.OpenASL
+      params:
+        <<: *openasl_roots
+        mode: test

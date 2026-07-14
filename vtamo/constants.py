@@ -1,0 +1,1 @@
+PROMPT = "Translate the given sentence into {}"
