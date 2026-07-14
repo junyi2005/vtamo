@@ -83,8 +83,10 @@ VTaMo introduces alignment at **three complementary granularities**, trained joi
 └── utils/                  S²-Wrapper, BLEU/ROUGE evaluation, helpers
 ```
 
-Every hyperparameter in `configs/vtamo_how2sign.yaml` is annotated with the paper
-section it comes from, so the config can be checked line-by-line against the text.
+Hyperparameters in `configs/vtamo_how2sign.yaml` are annotated with the paper section
+they come from, so the config can be checked line-by-line against the text. The handful
+of operational values the paper does not state (`t_warm`, `max_epochs`, validation
+interval) are explicitly marked as such rather than presented as paper values.
 
 ### Installation
 

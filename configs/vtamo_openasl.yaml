@@ -1,7 +1,11 @@
 # VTaMo — OpenASL.
 #
-# Every value below follows the camera-ready "Implementation details" section.
-# Paper references are given inline so the config can be checked against the text.
+# Values carrying an inline paper reference follow the camera-ready
+# "Implementation details" section verbatim, so this config can be checked
+# line-by-line against the text.
+#
+# A few operational values are NOT stated in the paper (t_warm, max_epochs,
+# queue min size, val interval); each is annotated as such where it appears.
 #
 # Set the dataset roots under `data:` to your own paths (see README "Data layout").
 
@@ -73,7 +77,7 @@ model:
     emd_eps: 0.05                        # eps_g = 0.05
     emd_iters: 20                        # 20 Sinkhorn iterations
     global_queue_size: 256               # memory queue capacity 256
-    global_queue_min_size: 32
+    global_queue_min_size: 32             # not stated in the paper
     lambda_g_max: 0.1                    # ramps 0 -> lambda_g_max = 0.1 ...
     emd_ramp_steps: 4000                 # ... over 4,000 steps after warm-up
     emd_schedule_type: linear
@@ -97,9 +101,11 @@ lightning:
     accumulate_grad_batches: 2           # gradient accumulation over 2 steps
     accelerator: gpu
     devices: 1                           # single A100
-    max_epochs: 200
+    # The paper does not state an epoch count; 500 is the value used for the
+    # reported runs. Early stopping / best-checkpoint selection on val BLEU-4.
+    max_epochs: 500
     gradient_clip_val: 1.0               # gradient clipping, max norm 1.0
-    check_val_every_n_epoch: 2
+    check_val_every_n_epoch: 2           # not stated in the paper
     precision: bf16                      # mixed-precision (bf16)
 
 data:
