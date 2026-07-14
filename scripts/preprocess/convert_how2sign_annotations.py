@@ -4,7 +4,7 @@
 If a pseudo-gloss JSON file is provided via ``--pseudo_gloss_json``, the
 ``text`` field of each entry will be replaced by the pseudo-gloss string, and
 the original sentence will be preserved under ``original_text``. That JSON file
-is produced by the external pseudo-gloss repo (``junyi/pseudo-gloss-English``);
+is produced by the bundled pseudo-gloss step (``pseudo_gloss/``);
 see README Step 0 for the end-to-end workflow.
 
 Without ``--pseudo_gloss_json`` the script falls back to writing the raw
@@ -61,7 +61,7 @@ def load_pseudo_gloss_map(path: Path) -> dict:
     """Load a JSON mapping of ``{original_sentence: pseudo_gloss_string}``.
 
     Keys are whitespace-stripped so that minor formatting differences between
-    the source handed to the external repo and the CSV ``SENTENCE`` column do
+    the source handed to the pseudo-gloss repo and the CSV ``SENTENCE`` column do
     not cause spurious misses.
     """
     if path is None:

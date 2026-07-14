@@ -56,9 +56,11 @@ VTaMo introduces alignment at **three complementary granularities**, trained joi
 
 ```
 .
-├── pseudo_gloss/           Step 1 — English sentence → content-word pseudo-gloss
-│                           (contraction expansion, ASL phrase merging, POS filter,
-│                           ASL reordering). Ships its own 27K ASL vocabulary.
+├── pseudo_gloss/           Step 1 — English sentence → content-word pseudo-gloss.
+│                           The paper's pseudo-gloss is a frozen spaCy POS filter
+│                           keeping NOUN/VERB/ADJ/ADV/NUM/PRON/PROPN (the default).
+│                           A ChatSign phrase-merge/reorder extension also ships,
+│                           clearly marked as NOT the paper's method.
 ├── scripts/
 │   ├── preprocess/         Step 2 — build How2Sign / OpenASL annotations; bridge
 │   │                       the pseudo-gloss into the annotation format
@@ -179,6 +181,6 @@ This project is released under the [Creative Commons Attribution-NonCommercial 4
 
 ## Acknowledgements
 
-The training codebase builds on **SpaMo** (Hwang et al., *An Efficient Gloss-Free Sign Language Translation Using Spatial Configurations and Motion Dynamics with LLMs*, NAACL 2025); files derived from it retain their original copyright headers. We also thank the authors of How2Sign, OpenASL, CLIP, Flan-T5, and S²-Wrapper, whose datasets and models this work depends on.
+The training codebase builds on [**SpaMo**](https://github.com/eddie-euijun-hwang/SpaMo) (Hwang et al., *An Efficient Gloss-Free Sign Language Translation Using Spatial Configurations and Motion Dynamics with LLMs*, NAACL 2025); files derived from it retain their original copyright headers. We also thank the authors of How2Sign, OpenASL, CLIP, Flan-T5, and S²-Wrapper, whose datasets and models this work depends on.
 
 This work was partially supported by ChatSign Technology, Ltd.; and the NYUAD Center for AI and Robotics (CAIR), funded by Tamkeen under the NYUAD Research Institute Award CG010. Computational support was provided by the HPC resources at NYU Abu Dhabi and NYU New York.

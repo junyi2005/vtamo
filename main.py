@@ -99,15 +99,21 @@ def get_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--warmup', type=int, default=None,
-        help='Force warm_up_steps to this value. If omitted (default), warm_up_steps '
-             'is auto-scaled from the actual training set size: '
-             'warmup = clamp(warmup_ratio * max_epochs * N_train / effective_batch, '
-             '              [warmup_min, warmup_max]).'
+        help='Force warm_up_steps to this value, overriding the config.'
+    )
+    parser.add_argument(
+        '--auto_warmup', action='store_true',
+        help='Auto-scale warm_up_steps from the actual training-set size instead of '
+             'using the config value: warmup = clamp(warmup_ratio * max_epochs * '
+             'N_train / effective_batch, [warmup_min, warmup_max]). Useful for small '
+             'runs where the config value would never finish. Off by default: the '
+             'config is authoritative, and warm_up_steps also gates the global '
+             'alignment schedule.'
     )
     parser.add_argument(
         '--warmup_ratio', type=float, default=0.016,
-        help='Fraction of total training steps used as warmup (default 0.016, '
-             'matches upstream 40000 / (500 ep * 5000 steps)).'
+        help='Fraction of total training steps used as warmup when --auto_warmup is '
+             'set (default 0.016, matches 40000 / (500 ep * 5000 steps)).'
     )
     parser.add_argument(
         '--warmup_min', type=int, default=100,
@@ -116,7 +122,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--warmup_max', type=int, default=40000,
         help='Upper bound for auto-scaled warmup (default 40000 matches the '
-             'original upstream value).'
+             'value used for the reported runs).'
     )
     return parser
 
@@ -361,20 +367,21 @@ def main():
     data.setup()
 
     # ------------------------------------------------------------------
-    # Auto-scale warm_up_steps from the actual training-set size.
+    # warm_up_steps resolution.
     #
-    # Rationale: the upstream configs hardcode warm_up_steps=40000, which is
-    # calibrated for ~5000 steps/epoch * 500 epochs. On a small pipeline run
-    # (e.g. 50 sentences, ~4 steps/epoch), 40k warmup never finishes and the
-    # LR never reaches its max.
+    # By default the CONFIG IS AUTHORITATIVE — warm_up_steps is left exactly as the
+    # yaml specifies. This matters because warm_up_steps is not only the LM-freeze
+    # switch: it is also the Stage 0 -> Stage 1 boundary of the global alignment
+    # schedule (and triggers the Procrustes init of T), so silently rescaling it
+    # would change the method.
     #
-    # Formula:
-    #   effective_batch = batch_size * accumulate_grad_batches
-    #   total_steps     = max(1, max_epochs * N_train // effective_batch)
-    #   warmup          = clamp(warmup_ratio * total_steps,
-    #                           [warmup_min, warmup_max])
-    #
-    # --warmup <N> short-circuits this and forces the value.
+    # --warmup <N>    forces a value.
+    # --auto_warmup   opts in to scaling from the actual training-set size, for small
+    #                 runs where a large configured warmup would never finish:
+    #                   effective_batch = batch_size * accumulate_grad_batches
+    #                   total_steps     = max(1, max_epochs * N_train // effective_batch)
+    #                   warmup          = clamp(warmup_ratio * total_steps,
+    #                                           [warmup_min, warmup_max])
     # ------------------------------------------------------------------
     if "params" in config.model:
         model_params = config.model.params
@@ -390,7 +397,7 @@ def main():
         if opt.warmup is not None:
             chosen = int(opt.warmup)
             source = "CLI --warmup"
-        elif n_train > 0:
+        elif opt.auto_warmup and n_train > 0:
             total_steps = max(1, max_epochs * n_train // effective_batch)
             raw = int(round(total_steps * opt.warmup_ratio))
             chosen = max(opt.warmup_min, min(opt.warmup_max, raw))
@@ -399,7 +406,7 @@ def main():
                       f"ratio={opt.warmup_ratio})")
         else:
             chosen = int(model_params.get("warm_up_steps", opt.warmup_min))
-            source = "fallback (dataset size unknown)"
+            source = "config"
 
         original = model_params.get("warm_up_steps", None)
         model_params.warm_up_steps = chosen

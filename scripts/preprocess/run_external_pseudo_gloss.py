@@ -4,15 +4,18 @@
 That module exposes three entry points, none of which emit the flat
 ``{sentence: "space-joined gloss"}`` JSON that this repo consumes:
 
-  * ``combined_pipeline.py``     — recommended. Library function
+  * ``combined_pipeline.py``     — ChatSign extension (phrase merge + ASL reorder),
+    NOT the paper's pseudo-gloss. Library function
     ``process_sentences(list[str]) → dict[str, list[str]]``. Its CLI only
     prints demo examples, so we call the function directly.
-  * ``pseudo_gloss_en.py``       — POS-only. Script-style; imports the helper
+  * ``pseudo_gloss_en.py``       — POS-only; this is the paper's pseudo-gloss and the
+    default. Script-style; imports the helper
     ``get_parts_of_speech`` from inside the module.
   * ``asl_gloss_seprate/asl_gloss_extract.py`` — vocabulary matching only,
     different JSON schema. Not used here.
 
-This bridge runs the ``combined`` (default) or ``pos_only`` pipeline on a list
+This bridge runs the ``pos_only`` (default, the paper's pseudo-gloss) or
+``combined`` pipeline on a list
 of sentences read from ``--input``, then writes the flat JSON at ``--output``.
 The output is the single file contract consumed by
 ``convert_how2sign_annotations.py`` / ``generate_openasl_labels.py`` — see
@@ -36,13 +39,13 @@ def _load_module(name: str, path: Path):
 
 
 def run_combined(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
-    """Invoke combined_pipeline.process_sentences from the external repo."""
+    """Invoke combined_pipeline.process_sentences from the bundled module."""
     combined_path = repo_root / "combined_pipeline.py"
     asl_dir = repo_root / "asl_gloss_seprate"
     if not combined_path.exists():
         raise FileNotFoundError(
             f"combined_pipeline.py not found under {repo_root}. "
-            f"Is --pseudo_gloss_repo pointing at a junyi/pseudo-gloss-English clone?"
+            f"Is --pseudo_gloss_repo pointing at the bundled pseudo_gloss/ directory?"
         )
     if not asl_dir.exists():
         raise FileNotFoundError(
@@ -60,7 +63,7 @@ def run_combined(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
     if not hasattr(mod, "process_sentences"):
         raise AttributeError(
             "combined_pipeline.py has no 'process_sentences' function — the "
-            "external repo API has changed; update this bridge."
+            "bundled pseudo_gloss API has changed; update this bridge."
         )
     return mod.process_sentences(sentences)
 
@@ -87,7 +90,7 @@ def run_pos_only(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
     if cut == -1:
         raise RuntimeError(
             "Cannot locate a safe prefix cut in pseudo_gloss_en.py — the "
-            "external repo layout has changed; update this bridge."
+            "bundled pseudo_gloss layout has changed; update this bridge."
         )
     ns: dict = {"__name__": "_ext_pseudo_gloss_en"}
     exec(compile(src[:cut], str(pg_path), "exec"), ns)
@@ -102,7 +105,7 @@ def run_pos_only(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
     for sent in sentences:
         try:
             triples = get_pos(sent, nlp)
-        except Exception as exc:  # noqa: BLE001 — match external repo behaviour
+        except Exception as exc:  # noqa: BLE001
             print(f"[warn] failed to process: {sent[:80]!r} ({exc})")
             out[sent] = []
             continue
@@ -113,7 +116,7 @@ def run_pos_only(repo_root: Path, sentences: list[str]) -> dict[str, list[str]]:
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Run the external junyi/pseudo-gloss-English repo on a text file "
+            "Run the bundled pseudo_gloss repo on a text file "
             "of sentences and emit the flat JSON this repo consumes "
             "(see README Step 0)."
         )

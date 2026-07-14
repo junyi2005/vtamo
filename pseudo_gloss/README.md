@@ -75,7 +75,7 @@ python -m spacy download en_core_web_sm
 
 ## Scripts
 
-### 1. `combined_pipeline.py` — Combined Pipeline (Recommended)
+### 1. `combined_pipeline.py` — Combined Pipeline (ChatSign extension, not the paper)
 
 Chains ASL vocabulary phrase merging with POS-based filtering. See above for details.
 

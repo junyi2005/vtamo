@@ -2,8 +2,8 @@
 """Combined Pipeline: ASL Vocabulary Phrase Merging + Pseudo-Gloss Filtering
 + ASL Grammar Reordering.
 
-Full parity with chatsign-auto's
-`backend/core/sign_video_generator.py::_extract_sentence_glosses_asl`:
+Mirrors the ChatSign production ASL gloss extractor
+(same filter logic and ASL grammar reordering):
 
   1. Expand contractions.
   2. Phrase-aware tokenization using ASL vocabulary (multi-word → single token).
@@ -36,14 +36,14 @@ import spacy
 SELECTED_POS = {"NOUN", "NUM", "ADV", "PRON", "PROPN", "ADJ", "VERB"}
 
 # Words English treats as stopwords but ASL retains (WH-words + negation).
-# Mirrors chatsign-auto/backend/core/sign_video_generator.py::_ASL_KEEP.
+# Tokens always kept, regardless of POS.
 ASL_KEEP = {
     "what", "who", "where", "when", "why", "how", "which",  # WH-words
     "not", "no",                                            # negation
 }
 
 # Constants used by the ASL grammar reorder step — verbatim copy from
-# chatsign-auto/backend/core/sign_video_generator.py (same module, same names).
+# Kept under the same names as the production extractor.
 _WH_WORDS = {"WHAT", "WHO", "WHERE", "WHEN", "WHY", "HOW", "WHICH"}
 _NEG_WORDS = {"NOT", "NEVER", "NOTHING", "NOBODY", "NEITHER", "NONE", "NO"}
 _TIME_WORDS = {

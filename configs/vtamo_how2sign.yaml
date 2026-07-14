@@ -42,7 +42,12 @@ model:
     alpha: 1.0
     use_in_context: false
     num_in_context: 0
-    warm_up_steps: 40000                 # stage-0 boundary: LM freeze + global-loss gate
+    # t_warm: LM-freeze switch AND the stage-0 boundary of the global alignment
+    # schedule (the lambda_g ramp and the Procrustes init of T both key off it).
+    # The paper does not state this value numerically; 40000 is the value used for
+    # the reported runs. main.py honours it as-is unless you pass --warmup /
+    # --auto_warmup.
+    warm_up_steps: 40000
 
     # ---- Local alignment (paper: "Alignment hyperparameters") ----
     local_align_enabled: true

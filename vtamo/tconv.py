@@ -9,9 +9,9 @@ import torch.nn.functional as F
 
 class AttentionPoolLayer(nn.Module):
     """
-    单层注意力池化模块，用于2倍降采样。
+    Single-layer attention pooling module for 2x downsampling.
 
-    类似于 TemporalConv 中的 K5 + P2，但使用注意力机制替代 MaxPool。
+    Similar to K5 + P2 in TemporalConv, but uses an attention mechanism instead of MaxPool.
     """
 
     def __init__(
@@ -28,33 +28,33 @@ class AttentionPoolLayer(nn.Module):
         self.window_size = window_size
         self.use_relative_pos = use_relative_pos
         self.head_dim = hidden_size // num_heads
-        self.downsample_rate = 2  # 每层2倍降采样
+        self.downsample_rate = 2  # 2x downsampling per layer
 
         assert hidden_size % num_heads == 0, "hidden_size must be divisible by num_heads"
 
-        # 类似 K5 的卷积
+        # K5-like convolution
         self.conv = nn.Sequential(
             nn.Conv1d(hidden_size, hidden_size, kernel_size=5, padding=2),
             nn.BatchNorm1d(hidden_size),
             nn.ReLU(inplace=True),
         )
 
-        # 注意力投影（替代 MaxPool）
+        # Attention projections (replacing MaxPool)
         self.query_proj = nn.Linear(hidden_size, hidden_size)
         self.key_proj = nn.Linear(hidden_size, hidden_size)
         self.value_proj = nn.Linear(hidden_size, hidden_size)
 
-        # 输出投影
+        # Output projection
         self.output_proj = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.LayerNorm(hidden_size),
             nn.Dropout(dropout),
         )
 
-        # 可学习的查询位置编码
+        # Learnable query positional encoding
         self.query_pos_embed = nn.Parameter(torch.randn(1, 1, hidden_size) * 0.02)
 
-        # 相对位置编码
+        # Relative positional encoding
         if use_relative_pos:
             self.max_relative_pos = window_size
             self.relative_pos_embed = nn.Embedding(
@@ -70,31 +70,31 @@ class AttentionPoolLayer(nn.Module):
     ) -> tuple:
         """
         Args:
-            x: [B, D, T] 输入特征
-            lgt: [B] 每个样本的有效长度
-            return_attn: 是否返回注意力权重
+            x: [B, D, T] input features
+            lgt: [B] valid length of each sample
+            return_attn: whether to return the attention weights
 
         Returns:
-            output: [B, D, T//2] 降采样后的特征
-            new_lgt: [B] 新的有效长度
-            attn_weights: [B, T//2, T] 注意力权重（仅当 return_attn=True）
+            output: [B, D, T//2] downsampled features
+            new_lgt: [B] new valid lengths
+            attn_weights: [B, T//2, T] attention weights (only when return_attn=True)
         """
         B, D, T = x.shape
         device = x.device
 
-        # Step 1: 卷积（类似 K5）
+        # Step 1: convolution (K5-like)
         x = self.conv(x)  # [B, D, T]
 
-        # 转换为 [B, T, D]
+        # Convert to [B, T, D]
         x = x.permute(0, 2, 1)
 
-        # Step 2: 注意力池化降采样（替代 P2 MaxPool）
+        # Step 2: attention pooling downsampling (replacing P2 MaxPool)
         T_out = T // self.downsample_rate
         new_lgt = lgt // self.downsample_rate
         T_out = max(T_out, 1)
         new_lgt = new_lgt.clamp(min=1)
 
-        # 构建注意力矩阵
+        # Build the attention matrix
         if return_attn:
             attn_matrix = torch.zeros(B, T_out, T, device=device, dtype=x.dtype)
         if return_stats:
@@ -104,7 +104,7 @@ class AttentionPoolLayer(nn.Module):
 
         outputs = []
         for i in range(T_out):
-            # 计算窗口范围
+            # Compute the window range
             center = (i + 0.5) * self.downsample_rate
             half_window = self.window_size // 2
 
@@ -117,26 +117,26 @@ class AttentionPoolLayer(nn.Module):
                 end = start + 1
                 window_len = 1
 
-            # 提取窗口
+            # Extract the window
             window = x[:, start:end, :]  # [B, window_len, D]
 
-            # 生成查询
+            # Generate the query
             query_input = window.mean(dim=1, keepdim=True) + self.query_pos_embed
 
-            # 投影
+            # Projections
             Q = self.query_proj(query_input)  # [B, 1, D]
             K = self.key_proj(window)  # [B, window_len, D]
             V = self.value_proj(window)  # [B, window_len, D]
 
-            # 多头注意力
+            # Multi-head attention
             Q = Q.view(B, 1, self.num_heads, self.head_dim).transpose(1, 2)
             K = K.view(B, window_len, self.num_heads, self.head_dim).transpose(1, 2)
             V = V.view(B, window_len, self.num_heads, self.head_dim).transpose(1, 2)
 
-            # 注意力分数
+            # Attention scores
             attn_scores = torch.matmul(Q, K.transpose(-1, -2)) / math.sqrt(self.head_dim)
 
-            # 相对位置偏置
+            # Relative position bias
             if self.use_relative_pos and window_len <= 2 * self.max_relative_pos + 1:
                 center = window_len // 2
                 rel_pos_indices = torch.arange(window_len, device=device) - center
@@ -146,7 +146,7 @@ class AttentionPoolLayer(nn.Module):
                 rel_bias = rel_bias.transpose(0, 1).unsqueeze(0).unsqueeze(2)
                 attn_scores = attn_scores + rel_bias
 
-            # 有效长度掩码
+            # Valid length mask
             frame_indices = torch.arange(start, end, device=device).unsqueeze(0)
             valid_mask = frame_indices < lgt.unsqueeze(1)
             valid_mask = valid_mask.unsqueeze(1).unsqueeze(2)
@@ -156,7 +156,7 @@ class AttentionPoolLayer(nn.Module):
             attn_weights = F.softmax(attn_scores, dim=-1)
             attn_weights = torch.nan_to_num(attn_weights, nan=1.0 / window_len)
 
-            # 保存注意力权重
+            # Save the attention weights
             if return_attn:
                 avg_attn = attn_weights.mean(dim=1).squeeze(1)
                 attn_matrix[:, i, start:end] = avg_attn
@@ -173,16 +173,16 @@ class AttentionPoolLayer(nn.Module):
                     entropy_sum += ent.sum()
                     count += peak.numel()
 
-            # 加权求和
+            # Weighted sum
             out = torch.matmul(attn_weights, V)
             out = out.transpose(1, 2).contiguous().view(B, 1, D)
             outputs.append(out)
 
-        # 拼接并投影
+        # Concatenate and project
         output = torch.cat(outputs, dim=1)  # [B, T_out, D]
         output = self.output_proj(output)
 
-        # 转换回 [B, D, T_out]
+        # Convert back to [B, D, T_out]
         output = output.permute(0, 2, 1)
 
         stats = None
@@ -200,35 +200,35 @@ class AttentionPoolLayer(nn.Module):
 
 class AttentionTemporalConv(nn.Module):
     """
-    可学习的注意力时序降采样模块 - 替代 TemporalConv
+    Learnable attention-based temporal downsampling module - a replacement for TemporalConv
 
-    两层结构，类似于 TemporalConv 的 K5+P2+K5+P2：
-    - Layer 1: Conv + AttentionPool (2倍降采样)
-    - Layer 2: Conv + AttentionPool (2倍降采样)
-    - 总共 4 倍降采样
+    Two-layer structure, similar to TemporalConv's K5+P2+K5+P2:
+    - Layer 1: Conv + AttentionPool (2x downsampling)
+    - Layer 2: Conv + AttentionPool (2x downsampling)
+    - 4x downsampling in total
 
-    核心区别：
-    - TemporalConv: 固定 kernel size 的卷积 + MaxPool 降采样
-      - 感受野固定（K5 + P2 + K5 + P2 → 每个输出帧固定看约16帧）
-      - MaxPool 不可学习，只选最大值
-      - 梯度只能传到被MaxPool选中的位置
+    Key differences:
+    - TemporalConv: convolution with fixed kernel size + MaxPool downsampling
+      - Fixed receptive field (K5 + P2 + K5 + P2 -> each output frame always sees about 16 frames)
+      - MaxPool is not learnable, it only picks the maximum value
+      - Gradients only reach the positions selected by MaxPool
 
-    - AttentionTemporalConv: 可学习的注意力降采样
-      - 每个输出位置用注意力关注输入帧
-      - 感受野由注意力权重动态决定，可学习
-      - 梯度可以反传到所有输入帧（通过 softmax 权重）
+    - AttentionTemporalConv: learnable attention-based downsampling
+      - Each output position attends to the input frames
+      - The receptive field is determined dynamically by the attention weights and is learnable
+      - Gradients can propagate back to all input frames (through the softmax weights)
 
-    输入: [B, D, T_orig] 原始帧特征 (与 TemporalConv 一致)
-    输出: [B, D, T_out] 降采样后特征，T_out ≈ T_orig / 4
+    Input: [B, D, T_orig] original frame features (same as TemporalConv)
+    Output: [B, D, T_out] downsampled features, T_out ≈ T_orig / 4
     """
 
     def __init__(
         self,
         input_size: int,
         hidden_size: int,
-        downsample_rate: int = 4,  # 总降采样率（必须是2的幂次）
+        downsample_rate: int = 4,  # Total downsampling rate (must be a power of 2)
         num_heads: int = 4,
-        window_size: int = 8,  # 每层的窗口大小
+        window_size: int = 8,  # Window size of each layer
         use_relative_pos: bool = True,
         dropout: float = 0.1,
         num_classes: int = -1,
@@ -242,18 +242,18 @@ class AttentionTemporalConv(nn.Module):
         self.use_relative_pos = use_relative_pos
         self.num_classes = num_classes
 
-        # 计算需要多少层（每层2倍降采样）
+        # Compute how many layers are needed (2x downsampling per layer)
         self.num_layers = int(math.log2(downsample_rate))
         assert 2 ** self.num_layers == downsample_rate, "downsample_rate must be power of 2"
 
-        # 输入投影
+        # Input projection
         self.input_proj = nn.Sequential(
             nn.Conv1d(input_size, hidden_size, kernel_size=3, padding=1),
             nn.BatchNorm1d(hidden_size),
             nn.ReLU(inplace=True),
         )
 
-        # 多层注意力池化
+        # Multi-layer attention pooling
         self.layers = nn.ModuleList([
             AttentionPoolLayer(
                 hidden_size=hidden_size,
@@ -265,7 +265,7 @@ class AttentionTemporalConv(nn.Module):
             for _ in range(self.num_layers)
         ])
 
-        # 可选的分类头
+        # Optional classification head
         if self.num_classes != -1:
             self.fc = nn.Linear(self.hidden_size, self.num_classes)
 
@@ -278,26 +278,26 @@ class AttentionTemporalConv(nn.Module):
     ):
         """
         Args:
-            frame_feat: [B, D, T] 原始帧特征（与 TemporalConv 接口一致）
-            lgt: [B] 每个样本的有效帧长度
-            return_attn: 是否返回注意力权重（用于反推原始帧对应关系）
+            frame_feat: [B, D, T] original frame features (same interface as TemporalConv)
+            lgt: [B] valid frame length of each sample
+            return_attn: whether to return the attention weights (used to recover the correspondence to original frames)
 
         Returns:
             dict with:
-                visual_feat: [T_out, B, D] 降采样后的帧特征
-                conv_logits: 分类 logits（如果 num_classes > 0）
-                feat_len: 降采样后的有效长度
-                attn_weights: [B, T_out, T_orig] 注意力权重矩阵（仅当 return_attn=True）
-                              attn_weights[b, m, t] = 降采样帧 m 对原始帧 t 的注意力权重
-                layer_attn_weights: List of [B, T_i, T_{i-1}] 每层的注意力权重
+                visual_feat: [T_out, B, D] downsampled frame features
+                conv_logits: classification logits (if num_classes > 0)
+                feat_len: valid lengths after downsampling
+                attn_weights: [B, T_out, T_orig] attention weight matrix (only when return_attn=True)
+                              attn_weights[b, m, t] = attention weight of downsampled frame m over original frame t
+                layer_attn_weights: List of [B, T_i, T_{i-1}] attention weights of each layer
         """
         B, D, T_orig = frame_feat.shape
         device = frame_feat.device
 
-        # Step 1: 输入投影 [B, D, T] -> [B, hidden_size, T]
+        # Step 1: input projection [B, D, T] -> [B, hidden_size, T]
         x = self.input_proj(frame_feat)
 
-        # Step 2: 逐层注意力池化降采样
+        # Step 2: layer-by-layer attention pooling downsampling
         current_lgt = lgt.clone()
         layer_attn_list = []
 
@@ -332,10 +332,10 @@ class AttentionTemporalConv(nn.Module):
                     count_sum = count_sum + layer_stats["count"]
 
         # x: [B, D, T_out]
-        # 转换为 [T_out, B, D]（与 TemporalConv 输出格式一致）
+        # Convert to [T_out, B, D] (same output format as TemporalConv)
         visual_feat = x.permute(2, 0, 1)
 
-        # 可选的分类头
+        # Optional classification head
         logits = None
         if self.num_classes != -1:
             logits = self.fc(x.permute(0, 2, 1))  # [B, T_out, num_classes]
@@ -347,20 +347,20 @@ class AttentionTemporalConv(nn.Module):
             "feat_len": current_lgt.cpu(),
         }
 
-        # 添加注意力信息（用于反推原始帧对应关系）
+        # Add attention information (used to recover the correspondence to original frames)
         if return_attn and len(layer_attn_list) > 0:
-            # 链式乘法计算最终的注意力矩阵
+            # Compute the final attention matrix by chained multiplication
             # A_total = A_layer2 @ A_layer1
-            # 这样 A_total[b, m, t] 表示最终降采样帧 m 对原始帧 t 的总注意力
+            # So A_total[b, m, t] is the total attention of final downsampled frame m over original frame t
             combined_attn = layer_attn_list[0]  # [B, T1, T_orig]
             for i in range(1, len(layer_attn_list)):
                 # layer_attn_list[i]: [B, T_{i+1}, T_i]
                 # combined_attn: [B, T_i, T_orig]
-                # 结果: [B, T_{i+1}, T_orig]
+                # result: [B, T_{i+1}, T_orig]
                 combined_attn = torch.bmm(layer_attn_list[i], combined_attn)
 
             result["attn_weights"] = combined_attn  # [B, T_out, T_orig]
-            result["layer_attn_weights"] = layer_attn_list  # 每层的注意力
+            result["layer_attn_weights"] = layer_attn_list  # attention of each layer
         if return_attn_stats and count_sum is not None and count_sum.item() > 0:
             result["attn_peak_mean"] = (peak_sum / count_sum).detach()
             result["attn_entropy_mean"] = (entropy_sum / count_sum).detach()
@@ -370,7 +370,7 @@ class AttentionTemporalConv(nn.Module):
         return result
 
     def update_lgt(self, lgt: torch.Tensor) -> torch.Tensor:
-        """计算降采样后的长度（与 TemporalConv 接口兼容）"""
+        """Compute the lengths after downsampling (compatible with the TemporalConv interface)"""
         return (lgt // self.downsample_rate).clamp(min=1)
 
 
@@ -479,49 +479,49 @@ def compute_frame_to_token_alignment(
     text_mask: torch.Tensor = None,
 ) -> dict:
     """
-    反推原始帧和 text token 的对应关系。
+    Recover the correspondence between original frames and text tokens.
 
-    通过链式关系计算：
-        P(原始帧 t 对应 token k) = Σ_m attn_weights[m, t] × alignment[m, k]
+    Computed through the chain relation:
+        P(original frame t corresponds to token k) = Σ_m attn_weights[m, t] × alignment[m, k]
 
     Args:
-        attn_weights: [B, T_out, T_orig] 降采样注意力权重
-                      attn_weights[b, m, t] = 降采样帧 m 对原始帧 t 的注意力
-        alignment_matrix: [B, T_out, K] OT 对齐矩阵
-                          alignment[b, m, k] = 降采样帧 m 对应 token k 的概率
-        text_mask: [B, K] 可选的文本掩码
+        attn_weights: [B, T_out, T_orig] downsampling attention weights
+                      attn_weights[b, m, t] = attention of downsampled frame m over original frame t
+        alignment_matrix: [B, T_out, K] OT alignment matrix
+                          alignment[b, m, k] = probability that downsampled frame m corresponds to token k
+        text_mask: [B, K] optional text mask
 
     Returns:
         dict with:
-            frame_token_prob: [B, T_orig, K] 原始帧对应各 token 的概率
-                              frame_token_prob[b, t, k] = P(帧 t 对应 token k)
-            frame_token_assignment: [B, T_orig] 每个原始帧对应的 token (argmax)
-            token_frame_ranges: List[List[Tuple[int, int]]] 每个 token 对应的帧范围
+            frame_token_prob: [B, T_orig, K] probability of each original frame corresponding to each token
+                              frame_token_prob[b, t, k] = P(frame t corresponds to token k)
+            frame_token_assignment: [B, T_orig] the token each original frame corresponds to (argmax)
+            token_frame_ranges: List[List[Tuple[int, int]]] the frame range of each token
                                 token_frame_ranges[b][k] = (start_frame, end_frame)
     """
     B, T_out, T_orig = attn_weights.shape
     _, _, K = alignment_matrix.shape
 
-    # 计算原始帧到 token 的概率
+    # Compute the probability from original frames to tokens
     # frame_token_prob[b, t, k] = Σ_m attn_weights[b, m, t] × alignment[b, m, k]
     # attn_weights: [B, T_out, T_orig] -> [B, T_orig, T_out]
     # alignment: [B, T_out, K]
-    # 结果: [B, T_orig, K]
+    # result: [B, T_orig, K]
     attn_weights_transposed = attn_weights.transpose(1, 2)  # [B, T_orig, T_out]
     frame_token_prob = torch.bmm(attn_weights_transposed, alignment_matrix)  # [B, T_orig, K]
 
-    # 归一化（可选，让每帧的概率和为1）
+    # Normalization (optional, makes the probabilities of each frame sum to 1)
     frame_token_prob = frame_token_prob / (frame_token_prob.sum(dim=-1, keepdim=True) + 1e-8)
 
-    # 每帧对应的 token (argmax)
+    # The token each frame corresponds to (argmax)
     frame_token_assignment = frame_token_prob.argmax(dim=-1)  # [B, T_orig]
 
-    # 计算每个 token 对应的帧范围
+    # Compute the frame range of each token
     token_frame_ranges = []
     for b in range(B):
         batch_ranges = []
         for k in range(K):
-            # 找到该 token 的所有帧
+            # Find all frames of this token
             token_mask = (frame_token_assignment[b] == k)
             if token_mask.any():
                 indices = torch.where(token_mask)[0]
@@ -547,13 +547,13 @@ def visualize_frame_token_alignment(
     save_path: str = None,
 ):
     """
-    可视化原始帧和 token 的对应关系。
+    Visualize the correspondence between original frames and tokens.
 
     Args:
-        frame_token_prob: [B, T_orig, K] 原始帧对应各 token 的概率
-        token_texts: 可选的 token 文本列表
-        sample_idx: 要可视化的样本索引
-        save_path: 保存路径（如果为 None 则显示）
+        frame_token_prob: [B, T_orig, K] probability of each original frame corresponding to each token
+        token_texts: optional list of token texts
+        sample_idx: index of the sample to visualize
+        save_path: save path (displays the figure if None)
     """
     try:
         import matplotlib.pyplot as plt
@@ -567,16 +567,16 @@ def visualize_frame_token_alignment(
 
     fig, ax = plt.subplots(figsize=(max(12, K * 0.5), max(8, T_orig * 0.05)))
 
-    # 绘制热力图
+    # Plot the heatmap
     im = ax.imshow(prob, aspect='auto', cmap='viridis')
     ax.set_xlabel('Token Index')
     ax.set_ylabel('Original Frame Index')
     ax.set_title('Frame-to-Token Alignment Probability')
 
-    # 添加 colorbar
+    # Add a colorbar
     plt.colorbar(im, ax=ax, label='Probability')
 
-    # 如果有 token 文本，添加标签
+    # If token texts are available, add labels
     if token_texts is not None and len(token_texts) >= K:
         ax.set_xticks(range(K))
         ax.set_xticklabels(token_texts[:K], rotation=45, ha='right')

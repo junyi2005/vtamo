@@ -2,8 +2,8 @@
 """Export unique OpenASL sentences to a flat text file.
 
 First step of the OpenASL pseudo-gloss workflow: produces the list of English
-sentences that the external pseudo-gloss repo (``junyi/pseudo-gloss-English``)
-consumes. The external repo then outputs a JSON mapping
+sentences that the bundled pseudo-gloss step (``pseudo_gloss/``)
+consumes. The pseudo-gloss step then outputs a JSON mapping
 {sentence: pseudo_gloss}, which is fed back into
 ``generate_openasl_labels.py`` via ``--pseudo_gloss_json``.
 

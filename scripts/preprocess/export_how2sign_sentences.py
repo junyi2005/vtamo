@@ -3,7 +3,7 @@
 
 This is the first step of the pseudo-gloss workflow: it produces the list of
 English sentences that the external pseudo-gloss repo
-(``junyi/pseudo-gloss-English``) consumes. The external repo then outputs a
+(``pseudo_gloss/``) consumes. The pseudo-gloss step then outputs a
 JSON mapping {sentence: pseudo_gloss}, which is fed back into
 ``convert_how2sign_annotations.py`` via ``--pseudo_gloss_json``.
 

@@ -34,17 +34,17 @@ from typing import Optional, Tuple, List
 # ==================== POSITION-ALIGNED CONTRASTIVE LOSS ====================
 
 def compute_position_contrastive_loss(
-    window_feats: torch.Tensor,  # [B, U, D] - 重排后的window特征
+    window_feats: torch.Tensor,  # [B, U, D] - reordered window features
     text_feats: torch.Tensor,    # [B, U, D] - text token embeddings (detached)
-    text_mask: torch.Tensor,     # [B, U] - 有效token掩码
+    text_mask: torch.Tensor,     # [B, U] - valid token mask
     temperature: float = 0.07,
     return_stats: bool = False,
 ) -> torch.Tensor:
     """
-    位置对齐的对比学习损失 (InfoNCE)。
+    Position-aligned contrastive loss (InfoNCE).
 
-    每个window和对应位置的text token为正样本，
-    和batch内所有其他text tokens为负样本。
+    Each window and the text token at the corresponding position form a positive pair;
+    all other text tokens in the batch serve as negative samples.
 
     L = -log(exp(sim(w_i, t_i)/τ) / Σ_{j∈batch} exp(sim(w_i, t_j)/τ))
 
@@ -53,44 +53,44 @@ def compute_position_contrastive_loss(
     - text_feats: should be detached -> no gradient to T5 LoRA
 
     Args:
-        window_feats: 重排后的window特征 [B, U, D] (has gradient)
+        window_feats: reordered window features [B, U, D] (has gradient)
         text_feats: text token embeddings [B, U, D] (should be detached)
-        text_mask: 有效token掩码 [B, U], 1=有效, 0=padding
-        temperature: 温度参数 (default: 0.07)
+        text_mask: valid token mask [B, U], 1=valid, 0=padding
+        temperature: temperature parameter (default: 0.07)
 
     Returns:
-        loss: 标量损失值
+        loss: scalar loss value
         (loss, stats) if return_stats=True
     """
     B, U, D = window_feats.shape
     device = window_feats.device
     dtype = window_feats.dtype
 
-    # L2归一化
+    # L2 normalization
     window_norm = F.normalize(window_feats, dim=-1)  # [B, U, D]
     text_norm = F.normalize(text_feats, dim=-1)      # [B, U, D]
 
-    # 展平为 [B*U, D]
+    # Flatten to [B*U, D]
     window_flat = window_norm.view(-1, D)  # [B*U, D]
     text_flat = text_norm.view(-1, D)      # [B*U, D]
     mask_flat = text_mask.view(-1)          # [B*U]
 
-    # 计算所有window和所有text tokens的相似度矩阵
+    # Compute the similarity matrix between all windows and all text tokens
     # logits[i, j] = <window_i, text_j> / τ
     logits = torch.mm(window_flat, text_flat.t()) / temperature  # [B*U, B*U]
 
-    # 正样本标签：对角线元素 (第i个window对应第i个text token)
+    # Positive labels: diagonal elements (the i-th window matches the i-th text token)
     labels = torch.arange(B * U, device=device)  # [B*U]
 
-    # 创建有效样本掩码 (只计算有效位置的loss)
+    # Create the valid sample mask (only compute loss at valid positions)
     valid_mask = mask_flat.float()  # [B*U]
 
-    # mask掉padding位置的负样本
+    # Mask out negatives at padding positions
     padding_mask = (mask_flat < 0.5)  # [B*U], True for padding
     logits_masked = logits.clone()
     logits_masked[:, padding_mask] = float('-inf')
 
-    # 保持对角线（正样本位置）
+    # Keep the diagonal (positive sample positions)
     diag_indices = torch.arange(B * U, device=device)
     diag_backup = logits[diag_indices, diag_indices].clone()
     restore_mask = padding_mask
@@ -99,7 +99,7 @@ def compute_position_contrastive_loss(
     # Cross-entropy loss
     loss_per_sample = F.cross_entropy(logits_masked, labels, reduction='none')  # [B*U]
 
-    # 只对有效位置求平均
+    # Average over valid positions only
     num_valid = valid_mask.sum().clamp(min=1.0)
     loss = (loss_per_sample * valid_mask).sum() / num_valid
 

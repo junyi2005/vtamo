@@ -58,7 +58,6 @@ from vtamo.clip_loss import clip_loss
 from vtamo.asb import AbstractSLT
 from vtamo.ot_sinkhorn import (
     LocalAlignmentModule,
-    reorder_by_alignment,
     reorder_by_window_alignment,
     compute_position_contrastive_loss,
     sinkhorn,
