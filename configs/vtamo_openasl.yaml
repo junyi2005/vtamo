@@ -121,6 +121,9 @@ data:
         mae_feat_root: ./assets/openasl
         spatial: true
         spatiotemporal: false
+        # Must match your extraction: scripts/extract_features/ emits
+        # "<file_id>_s2wrapping.npy" by default (--s2_mode s2wrapping).
+        # Set to "" if your .npy files are named "<file_id>.npy".
         spatial_postfix: "_s2wrapping"
         mode: train
     validation:

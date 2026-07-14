@@ -25,8 +25,12 @@ model:
   params:
     # ---- Language model (paper: "Language model") ----
     # The paper states Flan-T5-XL for all benchmarks, so that is what is set here.
-    # CSL-Daily is Chinese; google/mt5-xl is the multilingual alternative in this
-    # codebase if you find Flan-T5's Chinese coverage insufficient.
+    #
+    # CAVEAT: CSL-Daily is Chinese, and Flan-T5 has limited Chinese coverage.
+    # google/mt5-xl is the multilingual alternative and is what this codebase's
+    # own CSL-Daily configs use. If you are reproducing CSL-Daily, try mt5-xl:
+    #   model_name: google/mt5-xl
+    # (mT5 is an encoder-decoder like Flan-T5, so nothing else needs to change.)
     model_name: google/flan-t5-xl        # Flan-T5-XL backbone, frozen except LoRA
     cache_dir: ./cache
     tuning_type: lora
@@ -134,6 +138,9 @@ data:
         mae_feat_root: ./assets/csl_daily
         spatial: true
         spatiotemporal: false
+        # Must match your extraction: scripts/extract_features/ emits
+        # "<file_id>_s2wrapping.npy" by default (--s2_mode s2wrapping).
+        # Set to "" if your .npy files are named "<file_id>.npy".
         spatial_postfix: "_s2wrapping"
         spatiotemporal_postfix: ""
         mode: train

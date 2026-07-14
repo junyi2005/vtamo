@@ -163,12 +163,17 @@ python scripts/preprocess/run_external_pseudo_gloss.py \
     --spacy_model de_core_news_sm --input sentences.txt --output pseudo_gloss.json
 ```
 
-> **Honest caveat.** The How2Sign and OpenASL configs are the ones we exercised.
-> The Phoenix-2014T and CSL-Daily configs carry the same paper hyperparameters and
-> their dataset loaders and model instantiate cleanly, but we did not run them
-> end-to-end for this release. Treat their dataset roots as a starting point.
-> CSL-Daily is Chinese and the config uses Flan-T5-XL as the paper states;
-> `google/mt5-xl` is the multilingual alternative if you need better coverage.
+> **What we verified.** The model instantiates from all four configs, and the
+> dataset loaders were exercised against real data where we had it — Phoenix-2014T
+> loads its standard 7096 / 519 / 642 train/dev/test splits with 2048-d features.
+> We did not run any config to convergence for this release, so treat the dataset
+> roots as a starting point and check `spatial_postfix` matches how you extracted
+> your features (ours emit `_s2wrapping`).
+>
+> **CSL-Daily backbone.** The config uses Flan-T5-XL because the paper specifies it
+> for all benchmarks. Be aware that Flan-T5's Chinese coverage is limited and
+> `google/mt5-xl` is the usual choice for CSL-Daily — if you are reproducing that
+> benchmark, try mT5-XL first.
 
 ## 📌 TODO / Release Plan
 
