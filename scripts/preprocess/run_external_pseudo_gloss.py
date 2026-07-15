@@ -75,7 +75,7 @@ def run_pos_only(repo_root: Path, sentences: list[str],
     ``spacy_model`` selects the language-specific spaCy model. The POS filter
     itself is language-universal (Universal POS tags), so the same rule applies
     across benchmarks: en_core_web_sm (How2Sign / OpenASL), de_core_news_sm
-    (Phoenix-2014T), zh_core_web_sm (CSL-Daily).
+    (Phoenix-2014T).
     """
     pg_path = repo_root / "pseudo_gloss_en.py"
     if not pg_path.exists():
@@ -165,7 +165,7 @@ def parse_args():
         help=(
             "Language-specific spaCy model for the POS filter. The filter rule is "
             "language-universal; only the tagger changes. en_core_web_sm (How2Sign / "
-            "OpenASL), de_core_news_sm (Phoenix-2014T), zh_core_web_sm (CSL-Daily). "
+            "OpenASL), de_core_news_sm (Phoenix-2014T). "
             "Only used with --mode pos_only."
         ),
     )

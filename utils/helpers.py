@@ -88,8 +88,6 @@ def get_img_list(ds_name, vid_root, path):
     # Handling for different datasets
     if ds_name == 'Phoenix14T':
         img_path = os.path.join(vid_root, 'features', 'fullFrame-256x256px', path)
-    elif ds_name == 'CSL-Daily':
-        img_path = os.path.join(vid_root, 'CSL-Daily_256x256px', path)
     else:
         raise ValueError(f"Dataset {ds_name} is not supported.")
     return sorted(glob.glob(img_path))

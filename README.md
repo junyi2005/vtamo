@@ -144,15 +144,15 @@ Checkpoints and logs are written to `./logs/<run_name>/`.
 
 ### Benchmark coverage
 
-All four benchmarks in the paper have a config. The alignment and training
-hyperparameters are identical across them — only the dataset block differs.
+This release covers How2Sign, OpenASL, and Phoenix-2014T. The alignment and
+training hyperparameters are identical across them — only the dataset block
+differs.
 
 | Benchmark | Config | spaCy model for the pseudo-gloss | Splits |
 |---|---|---|---|
 | How2Sign | `configs/vtamo_how2sign.yaml` | `en_core_web_sm` | train / val / test |
 | OpenASL | `configs/vtamo_openasl.yaml` | `en_core_web_sm` | train / val / test |
 | Phoenix-2014T | `configs/vtamo_p14t.yaml` | `de_core_news_sm` | train / dev / test |
-| CSL-Daily | `configs/vtamo_csl_daily.yaml` | `zh_core_web_sm` | train / dev / test |
 
 The POS filter is language-universal (it keys off Universal POS tags); only the
 tagger changes. Select it with `--spacy_model`:
@@ -163,17 +163,12 @@ python scripts/preprocess/run_external_pseudo_gloss.py \
     --spacy_model de_core_news_sm --input sentences.txt --output pseudo_gloss.json
 ```
 
-> **What we verified.** The model instantiates from all four configs, and the
+> **What we verified.** The model instantiates from all three configs, and the
 > dataset loaders were exercised against real data where we had it — Phoenix-2014T
 > loads its standard 7096 / 519 / 642 train/dev/test splits with 2048-d features.
 > We did not run any config to convergence for this release, so treat the dataset
 > roots as a starting point and check `spatial_postfix` matches how you extracted
 > your features (ours emit `_s2wrapping`).
->
-> **CSL-Daily backbone.** The config uses Flan-T5-XL because the paper specifies it
-> for all benchmarks. Be aware that Flan-T5's Chinese coverage is limited and
-> `google/mt5-xl` is the usual choice for CSL-Daily — if you are reproducing that
-> benchmark, try mT5-XL first.
 
 ## 📌 TODO / Release Plan
 
@@ -181,7 +176,7 @@ We are actively cleaning up the codebase and model artifacts for release. Progre
 
 - [x] **Release training code** — data preparation + end-to-end training pipeline for the alignment objectives and decoder.
 - [ ] **Release inference & experiment code** — evaluation scripts, pseudo-gloss recovery, and reproduction of the reported benchmarks.
-- [ ] **Release checkpoints** — pre-trained VTaMo weights for the four benchmarks.
+- [ ] **Release checkpoints** — pre-trained VTaMo weights for the released benchmarks.
 
 ⭐ **Star / watch this repo** to be notified when each component lands.
 

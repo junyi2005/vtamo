@@ -164,8 +164,6 @@ def get_iterator(args, mode):
     ds_name_norm = ds_name.lower()
     if ds_name_norm in ('phoenix14t', 'phoenix-2014t'):
         canonical_ds = 'Phoenix14T'
-    elif ds_name_norm in ('csl-daily', 'csldaily', 'csl_daily'):
-        canonical_ds = 'CSL-Daily'
     elif ds_name_norm == 'how2sign':
         canonical_ds = 'How2Sign'
     else:
@@ -213,7 +211,7 @@ def get_iterator(args, mode):
             file_id = data[i]['fileid']
             st_value = None
 
-            if canonical_ds in ('Phoenix14T', 'CSL-Daily'):
+            if canonical_ds == 'Phoenix14T':
                 postfix = build_postfix(args, st_value)
                 if args.skip_existing:
                     save_path = osp.join(save_root, f'{file_id}{postfix}.npy')
@@ -319,8 +317,6 @@ def main():
             canonical_ds = 'How2Sign'
         elif ds_name_norm in ('phoenix14t', 'phoenix-2014t'):
             canonical_ds = 'Phoenix14T'
-        elif ds_name_norm in ('csl-daily', 'csldaily', 'csl_daily'):
-            canonical_ds = 'CSL-Daily'
         else:
             canonical_ds = ds_name
         _model_name = os.path.split(args.model_name)[-1]
