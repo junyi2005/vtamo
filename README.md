@@ -1,6 +1,6 @@
 # VTaMo: Video–Text Alignment Model for Sign Language Translation
 
-> Official repository for **VTaMo**, a gloss-free sign language translation framework built on **explicit multi-granularity vision–text alignment**.
+> Official code repository for **VTaMo**, a gloss-free sign language translation framework built on **explicit multi-granularity vision–text alignment**.
 
 <p align="center">
   <a href="https://arxiv.org/abs/2607.09126"><img src="https://img.shields.io/badge/arXiv-2607.09126-b31b1b"></a>
